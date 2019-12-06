@@ -42,6 +42,7 @@ def Pre_train(opt):
         remain_epoch = opt.epoch - epoch
         if epoch >= opt.lr_decrease_epoch:
             lr = opt.lr * remain_epoch / remain_epoch
+            lr = max(lr, 1e-7)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
     
@@ -161,6 +162,7 @@ def Continue_train_WGAN(opt):
         remain_epoch = opt.epoch - epoch
         if epoch >= opt.lr_decrease_epoch:
             lr = opt.lr * remain_epoch / remain_epoch
+            lr = max(lr, 1e-7)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
     
