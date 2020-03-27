@@ -1,120 +1,62 @@
-import numpy as np
-from PIL import Image
+import argparse
+import os
 import torch
-import torch.nn as nn
-from torchvision import transforms
-from skimage import color
+import numpy as np
+import cv2
 
-import network
-
-# ----------------------------------------
-#                 Testing
-# ----------------------------------------
-
-def text_readlines(filename):
-    # Try to read a txt file and return a list.Return [] if there was a mistake.
-    try:
-        file = open(filename, 'r')
-    except IOError:
-        error = []
-        return error
-    content = file.readlines()
-    # This for loop deletes the EOF (like \n)
-    for i in range(len(content)):
-        content[i] = content[i][:len(content[i])-1]
-    file.close()
-    return content
-
-def test(rgb, colornet):
-    out_rgb = colornet(rgb)
-    out_rgb = out_rgb.cpu().detach().numpy().reshape([3, 256, 256])
-    out_rgb = out_rgb.transpose(1, 2, 0)
-    out_rgb = (out_rgb * 0.5 + 0.5) * 255
-    out_rgb = out_rgb.astype(np.uint8)
-    return out_rgb
-    
-def getImage(root):
-    transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-
-    img = Image.open(root).convert('RGB')
-    #img = img.crop((256, 0, 512, 256))
-    rgb = img.resize((256, 256), Image.ANTIALIAS)
-    rgb = transform(rgb)
-    rgb = rgb.reshape([1, 3, 256, 256]).cuda()
-    return rgb
-
-def comparison(root, colornet):
-    # Read raw image
-    img = Image.open(root).convert('RGB')
-    real = img.crop((0, 0, 256, 256))
-    real = real.resize((256, 256), Image.ANTIALIAS)
-    real = np.array(real)
-    # Forward propagation
-    torchimg = getImage(root)
-    out_rgb = test(torchimg, colornet)
-    # Show
-    out_rgb = np.concatenate((out_rgb, real), axis = 1)
-    img_rgb = Image.fromarray(out_rgb)
-    img_rgb.show()
-    return img_rgb
-
-def colorization(root, colornet):
-    # Forward propagation
-    torchimg = getImage(root)
-    out_rgb = test(torchimg, colornet)
-    # Show
-    img_rgb = Image.fromarray(out_rgb)
-    img_rgb.show()
-    return img_rgb
-
-def generation(baseroot, saveroot, imglist, colornet):
-    for i in range(len(imglist)):
-		# Read raw image
-        readname = baseroot + imglist[i]
-        print(readname)
-        # Forward propagation
-        torchimg = getImage(readname)
-        out_rgb = test(torchimg, colornet)
-        # Save
-        img_rgb = Image.fromarray(out_rgb)
-        savename = saveroot + imglist[i]
-        img_rgb.save(savename)
-    print('Done!')
+import utils
+import dataset
 
 if __name__ == "__main__":
+    # ----------------------------------------
+    #        Initialize the parameters
+    # ----------------------------------------
+    parser = argparse.ArgumentParser()
+    # Pre-train, saving, and loading parameters
+    parser.add_argument('--pre_train', type = bool, default = False, help = 'pre_train or not')
+    parser.add_argument('--load_name', type = str, default = './track1/G_epoch8000_bs8.pth', \
+            help = 'load the pre-trained model with certain epoch, None for pre-training')
+    parser.add_argument('--test_batch_size', type = int, default = 1, help = 'size of the testing batches for single GPU')
+    parser.add_argument('--num_workers', type = int, default = 2, help = 'number of cpu threads to use during batch generation')
+    parser.add_argument('--val_path', type = str, default = './validation', help = 'saving path that is a folder')
+    parser.add_argument('--task_name', type = str, default = 'track1', help = 'task name for loading networks, saving, and log')
+    # Network initialization parameters
+    parser.add_argument('--pad', type = str, default = 'reflect', help = 'pad type of networks')
+    parser.add_argument('--activ_g', type = str, default = 'relu', help = 'activation type of generator')
+    parser.add_argument('--activ_d', type = str, default = 'lrelu', help = 'activation type of discriminator')
+    parser.add_argument('--norm', type = str, default = 'in', help = 'normalization type of networks')
+    parser.add_argument('--in_channels', type = int, default = 3, help = '1 for colorization, 3 for other tasks')
+    parser.add_argument('--out_channels', type = int, default = 3, help = '2 for colorization, 3 for other tasks')
+    parser.add_argument('--start_channels', type = int, default = 64, help = 'start channels for the main stream of generator')
+    # Dataset parameters
+    parser.add_argument('--baseroot_A', type = str, default = '', help = 'blurry image baseroot')
+    parser.add_argument('--baseroot_B', type = str, default = '', help = 'clean image baseroot')
+    parser.add_argument('--crop_size', type = int, default = 256, help = 'crop size for each image')
+    opt = parser.parse_args()
 
-    # Define the basic variables
-    root = 'C:\\Users\\ZHAO Yuzhi\\Desktop\\dataset\\ILSVRC2012_val_256\\ILSVRC2012_val_00001196.JPEG'
-    colornet = torch.load('Pre_image_epoch4_bs16.pth').cuda()
-    
-    '''
-    # Define generation variables
-    txtname = 'ILSVRC2012_val_name.txt'
-    imglist = text_readlines(txtname)
-    baseroot = 'D:\\datasets\\ILSVRC2012\\ILSVRC2012_val_256\\'
-    saveroot = 'D:\\datasets\\ILSVRC2012\\ILSVRC2012_val_256_colorization\\'
-    '''
+    # ----------------------------------------
+    #                   Test
+    # ----------------------------------------
+    # Initialize
+    generator = utils.create_generator(opt).cuda()
+    test_dataset = dataset.DeblurDataset_val(opt)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size = opt.test_batch_size, shuffle = False, num_workers = opt.num_workers, pin_memory = True)
+    sample_folder = os.path.join(opt.val_path, opt.task_name)
+    utils.check_path(sample_folder)
 
-    # Choose a task:
-    choice = 'colorization'
-    save = False
+    # forward
+    for i, (true_input, true_target, imgname) in enumerate(test_loader):
 
-    # comparison: Compare the colorization output and ground truth
-    # colorization: Show the colorization as original size
-    # generation: Generate colorization results given a folder
-    if choice == 'comparison':
-        img_rgb = comparison(root, colornet)
-        if save:
-            imgname = root.split('/')[-1]
-            img_rgb.save('./' + imgname)
-    if choice == 'colorization':
-        img_rgb = colorization(root, colornet)
-        if save:
-            imgname = root.split('/')[-1]
-            img_rgb.save('./' + imgname)
-    if choice == 'generation':
-        generation(baseroot, saveroot, imglist, colornet)
-    
+        # To device
+        true_input = true_input.cuda()
+        true_target = true_target.cuda()
+
+        # Forward propagation
+        with torch.no_grad():
+            fake_target = generator(true_input)
+
+        # Save
+        fake_target = fake_target.clone().data.permute(0, 2, 3, 1)[0, :, :, :].cpu().numpy()
+        fake_target = cv2.cvtColor(fake_target, cv2.COLOR_BGR2RGB).astype(np.uint8)
+        save_img_path = os.path.join(sample_folder, imgname)
+        

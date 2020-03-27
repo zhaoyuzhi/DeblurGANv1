@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from network_module import *
 
 # ----------------------------------------
@@ -63,6 +64,8 @@ class Generator(nn.Module):
         self.D3 = Conv2dLayer(opt.start_channels, opt.out_channels, 3, 1, 1, pad_type = opt.pad, norm = 'none', activation = 'tanh')
 
     def forward(self, x):
+
+        residual = x
         
         x = self.E1(x)                                          # out: batch * 64 * 256 * 256
         x = self.E2(x)                                          # out: batch * 128 * 128 * 128
@@ -82,7 +85,9 @@ class Generator(nn.Module):
         x = self.D2(x)                                          # out: batch * 64 * 256 * 256
         x = self.D3(x)                                          # out: batch * out_channel * 256 * 256
 
-        return x
+        out = residual - x
+
+        return out
 
 # ----------------------------------------
 #               Discriminator
@@ -95,12 +100,12 @@ class PatchDiscriminator70(nn.Module):
     def __init__(self, opt):
         super(PatchDiscriminator70, self).__init__()
         # Down sampling
-        self.block1 = Conv2dLayer(opt.in_channels + opt.out_channels, opt.start_channels, 3, 2, 1, pad_type = opt.pad, activation = opt.activ_d, norm = 'none')
-        self.block2 = Conv2dLayer(opt.start_channels, opt.start_channels * 2, 3, 2, 1, pad_type = opt.pad, activation = opt.activ_d, norm = opt.norm)
-        self.block3 = Conv2dLayer(opt.start_channels * 2, opt.start_channels * 4, 3, 2, 1, pad_type = opt.pad, activation = opt.activ_d, norm = opt.norm)
+        self.block1 = Conv2dLayer(opt.in_channels + opt.out_channels, opt.start_channels, 3, 2, 1, pad_type = opt.pad, activation = opt.activ_d, norm = 'none', sn = True)
+        self.block2 = Conv2dLayer(opt.start_channels, opt.start_channels * 2, 3, 2, 1, pad_type = opt.pad, activation = opt.activ_d, norm = opt.norm, sn = True)
+        self.block3 = Conv2dLayer(opt.start_channels * 2, opt.start_channels * 4, 3, 2, 1, pad_type = opt.pad, activation = opt.activ_d, norm = opt.norm, sn = True)
         # Final output, implemention of 70 * 70 PatchGAN
-        self.final1 = Conv2dLayer(opt.start_channels * 4, opt.start_channels * 8, 4, 1, 1, pad_type = opt.pad, activation = opt.activ_d, norm = opt.norm)
-        self.final2 = Conv2dLayer(opt.start_channels * 8, 1, 4, 1, 1, pad_type = opt.pad, activation = 'none', norm = 'none')
+        self.final1 = Conv2dLayer(opt.start_channels * 4, opt.start_channels * 8, 4, 1, 1, pad_type = opt.pad, activation = opt.activ_d, norm = opt.norm, sn = True)
+        self.final2 = Conv2dLayer(opt.start_channels * 8, 1, 4, 1, 1, pad_type = opt.pad, activation = 'none', norm = 'none', sn = True)
 
     def forward(self, img_A, img_B):
         # Concatenate image and condition image by channels to produce input

@@ -8,7 +8,7 @@ from torch.nn import Parameter
 #               Conv2d Block
 # ----------------------------------------
 class Conv2dLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride = 1, padding = 0, dilation = 1, pad_type = 'zero', activation = 'lrelu', norm = 'none', sn = True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride = 1, padding = 0, dilation = 1, pad_type = 'zero', activation = 'lrelu', norm = 'none', sn = False):
         super(Conv2dLayer, self).__init__()
         # Initialize the padding scheme
         if pad_type == 'reflect':
@@ -82,9 +82,8 @@ class ResConv2dLayer(nn.Module):
         super(ResConv2dLayer, self).__init__()
         # Initialize the conv scheme
         self.conv2d = nn.Sequential(
-            Conv2dLayer(in_channels, out_channels, kernel_size, stride, padding, dilation, pad_type, activation, norm, sn),
-            nn.Dropout2d(p = 0.5),
-            Conv2dLayer(out_channels, out_channels, kernel_size, stride, padding, dilation, pad_type, activation = 'none', norm = norm, sn = sn)
+            Conv2dLayer(in_channels, in_channels, kernel_size, stride, padding, dilation, pad_type, activation, norm, sn),
+            Conv2dLayer(in_channels, out_channels, kernel_size, stride, padding, dilation, pad_type, activation = 'none', norm = norm, sn = sn)
         )
         
         # Initialize the activation funtion

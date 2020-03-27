@@ -1,50 +1,98 @@
+import os
+import cv2
+import random
 import numpy as np
-from PIL import Image
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
 
 import utils
 
-class RandomCrop(object):
-    def __init__(self, image_size, crop_size):
-        self.ch, self.cw = crop_size
-        ih, iw = image_size
-        # Start from h1 and w1
-        self.h1 = random.randint(0, ih - self.ch)
-        self.w1 = random.randint(0, iw - self.cw)
-        # Crop h1 ~ h2 and w1 ~ w2
-        self.h2 = self.h1 + self.ch
-        self.w2 = self.w1 + self.cw
-        
-    def __call__(self, img):
-        if len(img.shape) == 3:
-            return img[self.h1 : self.h2, self.w1 : self.w2, :]
-        else:
-            return img[self.h1 : self.h2, self.w1 : self.w2]
-
 class DeblurDataset(Dataset):
-    def __init__(self, opt):
+    def __init__(self, opt, tag):
         self.opt = opt
-        self.imglist_A = utils.get_files(opt.baseroot_A).sort()
-        self.imglist_B = utils.get_files(opt.baseroot_B).sort()
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
+        self.blur_imglist = []
+        self.sharp_imglist = []
+        if tag == 'train':
+            imglist = utils.get_last_2paths(opt.baseroot_train_blur)
+            for i in range(len(imglist)):
+                self.blur_imglist.append(os.path.join(self.opt.baseroot_train_blur, imglist[i]))
+                self.sharp_imglist.append(os.path.join(self.opt.baseroot_train_sharp, imglist[i]))
+        if tag == 'val':
+            imglist = utils.get_last_2paths(opt.baseroot_val_blur)
+            for i in range(len(imglist)):
+                self.blur_imglist.append(os.path.join(self.opt.baseroot_val_blur, imglist[i]))
+                self.sharp_imglist.append(os.path.join(self.opt.baseroot_val_sharp, imglist[i]))
 
     def __getitem__(self, index):
-        # Blurry image
-        img = Image.open(self.imglist_A[index]).convert('RGB')
-        cropper = RandomCrop(img.shape[:2], (self.opt.crop_size, self.opt.crop_size))
-        img = cropper(img)
-        img = self.transform(img)
-        # Clean image
-        target = Image.open(self.imglist_B[index]).convert('RGB')
-        cropper = RandomCrop(target.shape[:2], (self.opt.crop_size, self.opt.crop_size))
-        target = cropper(target)
-        target = self.transform(target)
-        return img, target
+        # Path of one image
+        blur_img_path = self.blur_imglist[index]
+        clean_img_path = self.sharp_imglist[index]
+
+        # Read the images
+        blur_img = cv2.imread(blur_img_path)
+        blur_img = cv2.cvtColor(blur_img, cv2.COLOR_BGR2RGB)
+        clean_img = cv2.imread(clean_img_path)
+        clean_img = cv2.cvtColor(clean_img, cv2.COLOR_BGR2RGB)
+
+        # Random cropping
+        if self.opt.crop_size > 0:
+            h, w = blur_img.shape[:2]
+            rand_h = random.randint(0, h - self.opt.crop_size)
+            rand_w = random.randint(0, w - self.opt.crop_size)
+            blur_img = blur_img[rand_h:rand_h+self.opt.crop_size, rand_w:rand_w+self.opt.crop_size, :]
+            clean_img = clean_img[rand_h:rand_h+self.opt.crop_size, rand_w:rand_w+self.opt.crop_size, :]
+
+        # Normalized to [-1, 1]
+        blur_img = np.ascontiguousarray(blur_img, dtype = np.float32)
+        blur_img = (blur_img - 128.0) / 128.0
+        clean_img = np.ascontiguousarray(clean_img, dtype = np.float32)
+        clean_img = (clean_img - 128.0) / 128.0
+
+        # To PyTorch Tensor
+        blur_img = torch.from_numpy(blur_img).permute(2, 0, 1).contiguous()
+        clean_img = torch.from_numpy(clean_img).permute(2, 0, 1).contiguous()
+
+        return blur_img, clean_img
     
     def __len__(self):
-        return len(self.imglist_A)
+        return len(self.blur_imglist)
+
+class DeblurDataset_val(Dataset):
+    def __init__(self, opt):
+        self.opt = opt
+        self.imglist = utils.get_jpgs(opt.baseroot_test_blur)
+
+    def __getitem__(self, index):
+        # Path of one image
+        imgname = self.imglist[index]
+        blur_img_path = os.path.join(self.opt.baseroot_test_blur, imgname)
+        clean_img_path = os.path.join(self.opt.baseroot_test_sharp, imgname)
+
+        # Read the images
+        blur_img = cv2.imread(blur_img_path)
+        blur_img = cv2.cvtColor(blur_img, cv2.COLOR_BGR2RGB)
+        clean_img = cv2.imread(clean_img_path)
+        clean_img = cv2.cvtColor(clean_img, cv2.COLOR_BGR2RGB)
+
+        # Random cropping
+        if self.opt.crop_size > 0:
+            h, w = blur_img.shape[:2]
+            rand_h = random.randint(0, h - self.opt.crop_size)
+            rand_w = random.randint(0, w - self.opt.crop_size)
+            blur_img = blur_img[rand_h:rand_h+self.opt.crop_size, rand_w:rand_w+self.opt.crop_size, :]
+            clean_img = clean_img[rand_h:rand_h+self.opt.crop_size, rand_w:rand_w+self.opt.crop_size, :]
+
+        # Normalized to [-1, 1]
+        blur_img = np.ascontiguousarray(blur_img, dtype = np.float32)
+        blur_img = (blur_img - 128.0) / 128.0
+        clean_img = np.ascontiguousarray(clean_img, dtype = np.float32)
+        clean_img = (clean_img - 128.0) / 128.0
+
+        # To PyTorch Tensor
+        blur_img = torch.from_numpy(blur_img).permute(2, 0, 1).contiguous()
+        clean_img = torch.from_numpy(clean_img).permute(2, 0, 1).contiguous()
+
+        return blur_img, clean_img, imgname
+    
+    def __len__(self):
+        return len(self.imglist)
