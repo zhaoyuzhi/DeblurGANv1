@@ -31,8 +31,8 @@ if __name__ == "__main__":
     parser.add_argument('--b2', type = float, default = 0.999, help = 'Adam: decay of second order momentum of gradient')
     parser.add_argument('--weight_decay', type = float, default = 0, help = 'weight decay for optimizer')
     parser.add_argument('--lr_decrease_epoch', type = int, default = 150, help = 'lr decrease at certain epoch and its multiple')
-    parser.add_argument('--num_workers', type = int, default = 0, help = 'number of cpu threads to use during batch generation')
-    parser.add_argument('--lambda_gan', type = float, default = 0.01, help = 'coefficient for GAN Loss')
+    parser.add_argument('--num_workers', type = int, default = 8, help = 'number of cpu threads to use during batch generation')
+    parser.add_argument('--lambda_l1', type = float, default = 100, help = 'coefficient for GAN Loss')
     # Initialization parameters
     parser.add_argument('--pad', type = str, default = 'reflect', help = 'pad type of networks')
     parser.add_argument('--activ_g', type = str, default = 'relu', help = 'activation type of generator')
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument('--in_channels', type = int, default = 3, help = '1 for colorization, 3 for other tasks')
     parser.add_argument('--out_channels', type = int, default = 3, help = '2 for colorization, 3 for other tasks')
     parser.add_argument('--start_channels', type = int, default = 64, help = 'start channels for the main stream of generator')
-    parser.add_argument('--init_type', type = str, default = 'xavier', help = 'initialization type of networks')
+    parser.add_argument('--init_type', type = str, default = 'normal', help = 'initialization type of networks')
     parser.add_argument('--init_gain', type = float, default = 0.02, help = 'initialization gain of networks')
     parser.add_argument('--additional_training_d', type = int, default = 1, help = 'number of training D more times than G')
     # Dataset parameters

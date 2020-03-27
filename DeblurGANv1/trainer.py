@@ -307,7 +307,7 @@ def Continue_train_WGAN(opt):
             GAN_Loss = - torch.mean(fake_scalar)
 
             # Overall Loss and optimize
-            loss = Pixellevel_L1_Loss + opt.lambda_gan * GAN_Loss
+            loss = opt.lambda_l1 * Pixellevel_L1_Loss + GAN_Loss
             loss.backward()
             optimizer_G.step()
 

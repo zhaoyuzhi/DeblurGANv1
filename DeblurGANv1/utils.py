@@ -136,7 +136,7 @@ def get_last_2paths(path):
         for filespath in files:
             if filespath[-4:] == '.png':
                 wholepath = os.path.join(root, filespath)
-                last_2paths = os.path.join(wholepath.split('\\')[-2], wholepath.split('\\')[-1])
+                last_2paths = os.path.join(wholepath.split('/')[-2], wholepath.split('/')[-1])
                 ret.append(last_2paths)
     return ret
     

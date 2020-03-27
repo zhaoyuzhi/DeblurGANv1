@@ -117,3 +117,25 @@ class PatchDiscriminator70(nn.Module):
         x = self.final1(x)                                      # out: batch * 512 * 31 * 31
         x = self.final2(x)                                      # out: batch * 1 * 30 * 30
         return x
+
+if __name__ == "__main__":
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    # Initialization parameters
+    parser.add_argument('--pad', type = str, default = 'reflect', help = 'pad type of networks')
+    parser.add_argument('--activ_g', type = str, default = 'relu', help = 'activation type of generator')
+    parser.add_argument('--activ_d', type = str, default = 'lrelu', help = 'activation type of discriminator')
+    parser.add_argument('--norm', type = str, default = 'in', help = 'normalization type of networks')
+    parser.add_argument('--in_channels', type = int, default = 3, help = '1 for colorization, 3 for other tasks')
+    parser.add_argument('--out_channels', type = int, default = 3, help = '2 for colorization, 3 for other tasks')
+    parser.add_argument('--start_channels', type = int, default = 64, help = 'start channels for the main stream of generator')
+    parser.add_argument('--init_type', type = str, default = 'normal', help = 'initialization type of networks')
+    parser.add_argument('--init_gain', type = float, default = 0.02, help = 'initialization gain of networks')
+    parser.add_argument('--additional_training_d', type = int, default = 1, help = 'number of training D more times than G')
+    opt = parser.parse_args()
+
+    net = Generator(opt)
+    torch.save(net.state_dict(), 'test.pth')
+    

@@ -107,9 +107,7 @@ class ResConv2dLayer(nn.Module):
     def forward(self, x):
         residual = x
         out = self.conv2d(x)
-        out = out + residual
-        if self.activation:
-            out = self.activation(out)
+        out = 0.1 * out + residual
         return out
 
 # ----------------------------------------
